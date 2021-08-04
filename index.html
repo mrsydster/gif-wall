@@ -6,7 +6,7 @@
         <meta name="theme-color" content="#000000" />
         <meta name="Gif Viewer" content="Gif" />
         <title>Gif Viewer</title>
-        <script src="//streamdoctors.com/tmi.min.js"></script>
+        <script src="https://streamdoctors.com/tmi.min.js"></script>
         <style>
             * {
                 margin: 0;
@@ -14,21 +14,52 @@
                 box-sizing: border-box;
             }
 
-            body {
-                text-align: center;
-                color: white;
-                background: gray;
-                font-size: 100px;
+            .zoomer-img.portrait {
+                width: 40%;
+                height: 100%;
+                margin: 0 auto;
+                background-attachment: scroll;
+            }
+
+            .zoomer-img.nearest-neighbor {
+                image-rendering: optimizeSpeed;
+                image-rendering: -moz-crisp-edges;
+                image-rendering: -o-crisp-edges;
+                image-rendering: -webkit-optimize-contrast;
+                -ms-interpolation-mode: nearest-neighbor; /* IE8+ */
+            }
+
+            .zoomer-img {
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                background: no-repeat center center;
+                background-size: cover;
+                transition: background-image 0.2s ease-in-out;
+                z-index: -1;
+            }
+
+            .zoomer-img.right {
+                opacity: 0;
+                left: 50%;
+                transform: scaleX(-1);
+            }
+
+            .zoomer-img.right[data-mode='split'] {
+                opacity: 1;
+            }
+
+            .zoomer-img.left[data-mode='split'] {
+                right: 50%;
             }
         </style>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="wrapper">
-            <div id="channel"></div>
-            <img id="gif"/>
-        </div>
-        <script src="./main.js">
-        </script>
+        <div id="gif_left" class="zoomer-img left"></div>
+        <div id="gif_right" class="zoomer-img right"></div>
+        <script src="./main.js"></script>
     </body>
 </html>

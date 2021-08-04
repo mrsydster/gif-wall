@@ -1,4 +1,4 @@
-const { alert, tmi } = window;
+const { tmi } = window;
 
 const urlParams = new URLSearchParams(window.location.search);
 
@@ -90,6 +90,7 @@ const removeFromBanList = ({ banUser, username }) => {
     return sendTmiMessage({ channel, message: `@${username}: ${banUser} is unbanned!` });
 };
 
+// Function to set who is allowed to post gifs (mods|subs|everyone)
 const setMode = ({ mode, username }) => {
     currentMode = mode;
     document.cookie = `gif_mode=${mode}`;
@@ -114,40 +115,87 @@ const isAllowed = ({ tags }) => {
     }
 };
 
+// Function to wait for image laod.
+const imageLoaded = ({ src }) => {
+    return new Promise((resolve) => {
+        const image = new Image();
+        image.src = src;
+
+        image.addEventListener('load', () => {
+            resolve(image.src);
+        });
+    });
+};
+
+// Function to set view mode (split|fullscreen)
+const setGifViewMode = ({ mode }) => {
+    document.getElementById('gif_left').dataset.mode = mode;
+    document.getElementById('gif_right').dataset.mode = mode;
+    document.cookie = `gif_view_mode=${mode}`;
+};
+
 // Function to handle commands from chat
-const handleCommand = ({ command, args, tags }) => {
+const handleCommand = async ({ command, args, tags }) => {
     // Handle !gif with commands
     if (command === 'gif') {
         switch (args[0].toLowerCase()) {
             // mod only commands
             case 'allow':
                 if (!(tags.mod || tags.username === channel)) break;
-                else if (!args[1]?.match(/\beveryone\b|\bsubs\b|\bmods\b/))
-                    return sendTmiMessage({ channel, message: `@${tags.username} make sure to add valid group: !gif allow (everyone|subs|mods)` });
-                return setMode({ mode: args[1], username: tags.username });
+                else if (args[1] && !args[1].match(/\beveryone\b|\bsubs\b|\bmods\b/)) {
+                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add valid group: !gif allow (everyone|subs|mods)` });
+                    break;
+                }
+                setMode({ mode: args[1], username: tags.username });
+                break;
+
+            case 'split':
+                setGifViewMode({ mode: 'split' });
+                break;
+
+            case 'fullscreen':
+                setGifViewMode({ mode: 'fullscreen' });
+                break;
 
             case 'ban':
                 if (!(tags.mod || tags.username === channel)) break;
-                else if (!args[1]) return sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
-                return addToBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                else if (!args[1]) {
+                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
+                    break;
+                }
+                addToBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                break;
 
             case 'unban':
                 if (!(tags.mod || tags.username === channel)) break;
-                else if (!args[1]) return sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
-                return removeFromBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                else if (!args[1]) {
+                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
+                    break;
+                }
+                removeFromBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                break;
 
-            default:
+            default: {
+                if (!args[0]) {
+                    sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
+                    break;
+                }
+
                 const regexpResult =
-                    args[0]?.match(/https?:\/\/media\.giphy\.com\/media\/([A-z0-9]+)\/giphy\.gif/) ||
-                    args[0]?.match(/https?:\/\/giphy\.com\/embed\/([A-z0-9]+)/);
+                    args[0].match(/https?:\/\/media\.giphy\.com\/media\/([A-z0-9]+)\/giphy\.gif/) ||
+                    args[0].match(/https?:\/\/giphy\.com\/embed\/([A-z0-9]+)/);
 
                 if (!regexpResult) return sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
 
                 if (banList.includes(tags.username) || !isAllowed({ tags })) break;
 
-                document.getElementById('gif').src = `https://media.giphy.com/media/${regexpResult[1]}/giphy.gif`;
-                //media.giphy.com/media/heVkiIl8Wx3r5rwIQ6/giphy.gif
-                https: break;
+                const imageSrc = await imageLoaded({ src: `https://media.giphy.com/media/${regexpResult[1]}/giphy.gif` });
+
+                document.getElementById('gif_left').style.backgroundImage = `url(${imageSrc})`;
+                document.getElementById('gif_right').style.backgroundImage = `url(${imageSrc})`;
+
+                break;
+            }
         }
     }
 };
@@ -170,14 +218,18 @@ client.on('message', (_, tags, message, self) => {
 // Connect to tmi
 client.connect();
 
-document.getElementById('channel').innerHTML = channel;
+// Set view mode from cookie
+setGifViewMode({ mode: readCookie('gif_view_mode') || 'fullscreen' });
 
-// Todo:
+// TODO:
+
+// show name in right bottom corner who posted the gif
+// make url paramenter for length of gifs displayed
+// add either a queue or a timeout system for when next gif can be showed.
+// add default gif and skip commmand so that mods can skip the command
+
+// DONE:
 
 // make gifs fullscreen and split with right mirrored
 // add command to control fullscreen or split
 // add fade between gifs
-// show name in right bottom corner
-// make url paramenter for length of gifs
-// add either a queue or a timeout system for when next gif can be showed.
-// add default gif an skip commmand so that mods can skip the command
