@@ -13,7 +13,7 @@ if (urlParams.get('clearcookies') !== null && confirm('Are you sure to delete co
 const readCookie = (name) => {
     const nameEQ = `${name}=`;
     const ca = document.cookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
+    for (let i = 0; i < ca.length; i += 1) {
         let c = ca[i];
         while (c.charAt(0) === ' ') c = c.substring(1, c.length);
         if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
@@ -22,8 +22,8 @@ const readCookie = (name) => {
 };
 
 // Get parameters from url
-const username = urlParams.get('botusername'); // streamdoctorsbot
-const oauth = urlParams.get('oauth'); // oauth:ncrzdqqnzaau9wyefofjzh0xtai7i1
+const username = urlParams.get('botusername');
+const oauth = urlParams.get('oauth');
 
 const channel = (
     urlParams.get('channel') ||
@@ -31,6 +31,16 @@ const channel = (
     prompt(`Channel parameter is missing in URL (channel=xxxx)\n\nPlease enter the Twitch channel:`, 'twitch') ||
     'twitch'
 ).toLowerCase(); // If no channel is filled > use twitch as channel
+
+const gifDuration = isNaN(urlParams.get('duration')) ? 6 : Number(urlParams.get('duration'));
+
+// Check if default gif is valid url
+const skipGifParam = urlParams.get('skip') || '';
+const skipGif =
+    skipGifParam.match(/https?:\/\/media\.giphy\.com\/media\/([A-z0-9]+)\/giphy\.gif/) ||
+    skipGifParam.match(/https?:\/\/giphy\.com\/embed\/([A-z0-9]+)/)
+        ? skipGifParam
+        : `https://media.giphy.com/media/pTIaVha38QDA8EdSCJ/giphy.gif`;
 
 // Set the channel cookie
 if (channel !== 'twitch') document.cookie = `twitch_channel=${channel}`;
@@ -59,9 +69,10 @@ if (!username || !oauth) {
 // Create tmi client
 const client = new tmi.Client(tmiOptions);
 
-// Create banlist
-let banList = JSON.parse(readCookie('ban_list') || '[]');
+// Set up variables
+let banList = JSON.parse(readCookie('ban_list') || '[]'); // Create banlist
 let currentMode = readCookie('gif_mode') || 'everyone'; // Set mode what is allowed (mods|subs|everyone)
+let gifTimeout = false;
 
 // Function to send tmi message if able torespond.
 const sendTmiMessage = ({ channel, message }) => {
@@ -127,22 +138,34 @@ const imageLoaded = ({ src }) => {
     });
 };
 
+// Get DOM elements
+const leftGifEl = document.getElementById('gif_left');
+const rightGifEl = document.getElementById('gif_right');
+const usernameEl = document.getElementById('username');
+
 // Function to set view mode (split|fullscreen)
 const setGifViewMode = ({ mode }) => {
-    document.getElementById('gif_left').dataset.mode = mode;
-    document.getElementById('gif_right').dataset.mode = mode;
+    leftGifEl.dataset.mode = mode;
+    rightGifEl.dataset.mode = mode;
     document.cookie = `gif_view_mode=${mode}`;
 };
+
+// Set view mode from cookie
+setGifViewMode({ mode: readCookie('gif_view_mode') || 'fullscreen' });
+
+const modCommands = ['allow', 'split', 'fullscreen', 'skip', 'ban', 'unban'];
 
 // Function to handle commands from chat
 const handleCommand = async ({ command, args, tags }) => {
     // Handle !gif with commands
-    if (command === 'gif') {
-        switch (args[0].toLowerCase()) {
+    if (command !== 'gif') return;
+
+    // Check for possible mod commands
+    if (modCommands.includes(args[0].toLowerCase()) && (tags.mod || tags.username === channel)) {
+        switch (args[0]) {
             // mod only commands
             case 'allow':
-                if (!(tags.mod || tags.username === channel)) break;
-                else if (args[1] && !args[1].match(/\beveryone\b|\bsubs\b|\bmods\b/)) {
+                if (args[1] && !args[1].match(/\beveryone\b|\bsubs\b|\bmods\b/)) {
                     sendTmiMessage({ channel, message: `@${tags.username} make sure to add valid group: !gif allow (everyone|subs|mods)` });
                     break;
                 }
@@ -157,9 +180,18 @@ const handleCommand = async ({ command, args, tags }) => {
                 setGifViewMode({ mode: 'fullscreen' });
                 break;
 
+            case 'skip': {
+                // Preload gif
+                const imageSrc = await imageLoaded({ src: skipGif });
+
+                // Set gif
+                leftGifEl.style.backgroundImage = `url(${imageSrc})`;
+                rightGifEl.style.backgroundImage = `url(${imageSrc})`;
+                break;
+            }
+
             case 'ban':
-                if (!(tags.mod || tags.username === channel)) break;
-                else if (!args[1]) {
+                if (!args[1]) {
                     sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
                     break;
                 }
@@ -167,8 +199,7 @@ const handleCommand = async ({ command, args, tags }) => {
                 break;
 
             case 'unban':
-                if (!(tags.mod || tags.username === channel)) break;
-                else if (!args[1]) {
+                if (!args[1]) {
                     sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
                     break;
                 }
@@ -176,27 +207,53 @@ const handleCommand = async ({ command, args, tags }) => {
                 break;
 
             default: {
-                if (!args[0]) {
-                    sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
-                    break;
-                }
-
-                const regexpResult =
-                    args[0].match(/https?:\/\/media\.giphy\.com\/media\/([A-z0-9]+)\/giphy\.gif/) ||
-                    args[0].match(/https?:\/\/giphy\.com\/embed\/([A-z0-9]+)/);
-
-                if (!regexpResult) return sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
-
-                if (banList.includes(tags.username) || !isAllowed({ tags })) break;
-
-                const imageSrc = await imageLoaded({ src: `https://media.giphy.com/media/${regexpResult[1]}/giphy.gif` });
-
-                document.getElementById('gif_left').style.backgroundImage = `url(${imageSrc})`;
-                document.getElementById('gif_right').style.backgroundImage = `url(${imageSrc})`;
-
                 break;
             }
         }
+    } else {
+        // If waiting for gif to end, return
+        if (gifTimeout) return;
+
+        // Check if !gif has any arguments
+        if (!args[0]) {
+            sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
+            return;
+        }
+
+        // Check if url matches
+        const regexpResult =
+            args[0].match(/https?:\/\/media\.giphy\.com\/media\/([A-z0-9]+)\/giphy\.gif/) ||
+            args[0].match(/https?:\/\/giphy\.com\/embed\/([A-z0-9]+)/);
+
+        // Response if url does not match
+        if (!regexpResult) {
+            sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
+            return;
+        }
+
+        // Is user allowed to post gif
+        if (banList.includes(tags.username) || !isAllowed({ tags })) return;
+
+        // Preload gif
+        const imageSrc = await imageLoaded({ src: `https://media.giphy.com/media/${regexpResult[1]}/giphy.gif` });
+
+        // Set timeout to next gif
+        gifTimeout = true;
+        window.setTimeout(() => {
+            gifTimeout = false;
+        }, gifDuration * 1000);
+
+        // Set gif
+        leftGifEl.style.backgroundImage = `url(${imageSrc})`;
+        rightGifEl.style.backgroundImage = `url(${imageSrc})`;
+
+        // Show and hide which user requested the Gif
+        usernameEl.style.opacity = 0.5;
+        usernameEl.innerHTML = tags['display-name'];
+
+        window.setTimeout(() => {
+            usernameEl.style.opacity = 0;
+        }, 1700);
     }
 };
 
@@ -217,19 +274,3 @@ client.on('message', (_, tags, message, self) => {
 
 // Connect to tmi
 client.connect();
-
-// Set view mode from cookie
-setGifViewMode({ mode: readCookie('gif_view_mode') || 'fullscreen' });
-
-// TODO:
-
-// show name in right bottom corner who posted the gif
-// make url paramenter for length of gifs displayed
-// add either a queue or a timeout system for when next gif can be showed.
-// add default gif and skip commmand so that mods can skip the command
-
-// DONE:
-
-// make gifs fullscreen and split with right mirrored
-// add command to control fullscreen or split
-// add fade between gifs

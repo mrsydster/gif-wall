@@ -54,6 +54,10 @@
                     "endOfLine": "auto"
                 }
             ]
+        },
+        "env": {
+            "browser": true,
+            "node": true
         }
     }
 }

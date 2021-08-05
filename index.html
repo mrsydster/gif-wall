@@ -6,12 +6,19 @@
         <meta name="theme-color" content="#000000" />
         <meta name="Gif Viewer" content="Gif" />
         <title>Gif Viewer</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@900&display=swap" rel="stylesheet" />
         <script src="https://streamdoctors.com/tmi.min.js"></script>
         <style>
             * {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Roboto', sans-serif;
             }
 
             .zoomer-img.portrait {
@@ -54,12 +61,24 @@
             .zoomer-img.left[data-mode='split'] {
                 right: 50%;
             }
+
+            #username {
+                position: absolute;
+                right: 0;
+                bottom: 0;
+                font-size: 2rem;
+                color: white;
+                margin: 1rem 1.5rem;
+                opacity: 0;
+                transition: opacity 0.6s ease-in-out;
+            }
         </style>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="gif_left" class="zoomer-img left"></div>
         <div id="gif_right" class="zoomer-img right"></div>
+        <div id="username"></div>
         <script src="./main.js"></script>
     </body>
 </html>
