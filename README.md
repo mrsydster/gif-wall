@@ -5,7 +5,7 @@
 !gif fullscreen                     Displays gif fullscreen
 !gif split                          Displays gif in 50% horizontal split
 !gif duration (number in seconds)   Sets how long a gif will be displayed
-!gif (mods|subs|everyone)           Sets who can post gifs in chat
+!gif allow (mods|subs|everyone)     Sets who can post gifs in chat
 !gif ban (username)                 Bans user from posting gifs
 !gif unban (username)               Unbans user from posting gifs
 

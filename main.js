@@ -32,8 +32,6 @@ const channel = (
     'twitch'
 ).toLowerCase(); // If no channel is filled > use twitch as channel
 
-const gifDuration = isNaN(urlParams.get('duration')) ? 6 : Number(urlParams.get('duration'));
-
 // Check if default gif is valid url
 const skipGifParam = urlParams.get('skip') || '';
 const skipGif =
@@ -73,40 +71,41 @@ const client = new tmi.Client(tmiOptions);
 let banList = JSON.parse(readCookie('ban_list') || '[]'); // Create banlist
 let currentMode = readCookie('gif_mode') || 'everyone'; // Set mode what is allowed (mods|subs|everyone)
 let gifTimeout = false;
+let gifDuration = isNaN(urlParams.get('duration')) ? 6 : Number(urlParams.get('duration'));
 
 // Function to send tmi message if able torespond.
-const sendTmiMessage = ({ channel, message }) => {
+const sendTmiMessage = ({ message }) => {
     if (!tmiOptions.identity.username) return;
 
     client.say(channel, message);
 };
 
 // Function to add user to banlist
-const addToBanList = ({ banUser, username }) => {
-    if (banList.includes(banUser)) return sendTmiMessage({ channel, message: `@${username}: ${banUser} is already banned!` });
+const addToBanList = ({ banUser, tusername }) => {
+    if (banList.includes(banUser)) return sendTmiMessage({ message: `@${tusername}: ${banUser} is already banned!` });
 
     banList.push(banUser);
     document.cookie = `ban_list=${JSON.stringify(banList)}`;
 
-    return sendTmiMessage({ channel, message: `@${username}: ${banUser} is now banned from posting gifs!` });
+    return sendTmiMessage({ message: `@${username}: ${banUser} is now banned from posting gifs!` });
 };
 
 // Function to add user to banlist
-const removeFromBanList = ({ banUser, username }) => {
-    if (!banList.includes(banUser)) return sendTmiMessage({ channel, message: `@${username}: ${banUser} is not banned!` });
+const removeFromBanList = ({ banUser, tusername }) => {
+    if (!banList.includes(banUser)) return sendTmiMessage({ message: `@${tusername}: ${banUser} is not banned!` });
 
     banList = banList.filter((e) => e !== banUser);
     document.cookie = `ban_list=${JSON.stringify(banList)}`;
 
-    return sendTmiMessage({ channel, message: `@${username}: ${banUser} is unbanned!` });
+    return sendTmiMessage({ message: `@${username}: ${banUser} is unbanned!` });
 };
 
 // Function to set who is allowed to post gifs (mods|subs|everyone)
-const setMode = ({ mode, username }) => {
+const setMode = ({ mode, tusername }) => {
     currentMode = mode;
     document.cookie = `gif_mode=${mode}`;
 
-    return sendTmiMessage({ channel, message: `@${username} ${currentMode} can post a gif` });
+    return sendTmiMessage({ message: `@${tusername} ${currentMode} can post a gif` });
 };
 
 // Function to check if user is currently allowed to post a gif depending on the mode (mods|subs|everyone)
@@ -153,7 +152,7 @@ const setGifViewMode = ({ mode }) => {
 // Set view mode from cookie
 setGifViewMode({ mode: readCookie('gif_view_mode') || 'fullscreen' });
 
-const modCommands = ['allow', 'split', 'fullscreen', 'skip', 'ban', 'unban'];
+const modCommands = ['allow', 'split', 'fullscreen', 'skip', 'ban', 'unban', 'duration'];
 
 // Function to handle commands from chat
 const handleCommand = async ({ command, args, tags }) => {
@@ -164,22 +163,6 @@ const handleCommand = async ({ command, args, tags }) => {
     if (modCommands.includes(args[0].toLowerCase()) && (tags.mod || tags.username === channel)) {
         switch (args[0]) {
             // mod only commands
-            case 'allow':
-                if (args[1] && !args[1].match(/\beveryone\b|\bsubs\b|\bmods\b/)) {
-                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add valid group: !gif allow (everyone|subs|mods)` });
-                    break;
-                }
-                setMode({ mode: args[1], username: tags.username });
-                break;
-
-            case 'split':
-                setGifViewMode({ mode: 'split' });
-                break;
-
-            case 'fullscreen':
-                setGifViewMode({ mode: 'fullscreen' });
-                break;
-
             case 'skip': {
                 // Preload gif
                 const imageSrc = await imageLoaded({ src: skipGif });
@@ -190,20 +173,46 @@ const handleCommand = async ({ command, args, tags }) => {
                 break;
             }
 
-            case 'ban':
-                if (!args[1]) {
-                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
+            case 'duration': {
+                if (isNaN(args[1]) || args[1] <= 0) {
+                    sendTmiMessage({ message: `@${tags.username} make sure to add a duration in seconds` });
                     break;
                 }
-                addToBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                gifDuration = Number(args[1]);
+                sendTmiMessage({ message: `@${tags.username} gif duration set to ${gifDuration} ${gifDuration === 1 ? 'second' : 'seconds'}` });
+                break;
+            }
+
+            case 'allow':
+                if (args[1] && !args[1].match(/\beveryone\b|\bsubs\b|\bmods\b/)) {
+                    sendTmiMessage({ message: `@${tags.username} make sure to add valid group: !gif allow (everyone|subs|mods)` });
+                    break;
+                }
+                setMode({ mode: args[1], tusername: tags.username });
+                break;
+
+            case 'split':
+                setGifViewMode({ mode: 'split' });
+                break;
+
+            case 'fullscreen':
+                setGifViewMode({ mode: 'fullscreen' });
+                break;
+
+            case 'ban':
+                if (!args[1]) {
+                    sendTmiMessage({ message: `@${tags.username} make sure to add the username` });
+                    break;
+                }
+                addToBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], tusername: tags.username });
                 break;
 
             case 'unban':
                 if (!args[1]) {
-                    sendTmiMessage({ channel, message: `@${tags.username} make sure to add the username` });
+                    sendTmiMessage({ message: `@${tags.username} make sure to add the username` });
                     break;
                 }
-                removeFromBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], username: tags.username });
+                removeFromBanList({ banUser: args[1].startsWith('@') ? args[1].slice(1) : args[1], tusername: tags.username });
                 break;
 
             default: {
@@ -216,7 +225,7 @@ const handleCommand = async ({ command, args, tags }) => {
 
         // Check if !gif has any arguments
         if (!args[0]) {
-            sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
+            sendTmiMessage({ message: `@${tags.username} only gifs from giphy.com are allowed!` });
             return;
         }
 
@@ -227,7 +236,7 @@ const handleCommand = async ({ command, args, tags }) => {
 
         // Response if url does not match
         if (!regexpResult) {
-            sendTmiMessage({ channel, message: `@${tags.username} only gifs from giphy.com are allowed!` });
+            sendTmiMessage({ message: `@${tags.username} only gifs from giphy.com are allowed!` });
             return;
         }
 
